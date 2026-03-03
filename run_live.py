@@ -5,7 +5,7 @@ import argparse
 import os
 import time
 
-from quant_system import MovingAverageCrossStrategy
+from quant_system import AdaptiveMultiFactorStrategy, MovingAverageCrossStrategy
 from quant_system.live import BinanceMarketDataClient, BinanceSpotTrader, YahooUSMarketDataClient
 
 
@@ -16,6 +16,7 @@ def main() -> None:
     parser.add_argument("--interval", default="1m")
     parser.add_argument("--short-window", type=int, default=5)
     parser.add_argument("--long-window", type=int, default=20)
+    parser.add_argument("--strategy", choices=["ma", "adaptive"], default="adaptive")
     parser.add_argument("--quantity", type=float, required=True, help="Order quantity per trade")
     parser.add_argument("--poll-seconds", type=int, default=30)
     parser.add_argument("--iterations", type=int, default=5, help="Loop count, -1 for infinite")
@@ -33,7 +34,10 @@ def main() -> None:
 
     data_client = BinanceMarketDataClient() if args.market == "crypto" else YahooUSMarketDataClient()
     trader = BinanceSpotTrader(api_key=api_key, api_secret=api_secret, dry_run=not args.live)
-    strategy = MovingAverageCrossStrategy(short_window=args.short_window, long_window=args.long_window)
+    if args.strategy == "ma":
+        strategy = MovingAverageCrossStrategy(short_window=args.short_window, long_window=args.long_window)
+    else:
+        strategy = AdaptiveMultiFactorStrategy(short_window=args.short_window, long_window=args.long_window)
 
     current_position = 0
     last_buy_date = None
