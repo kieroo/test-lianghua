@@ -28,6 +28,23 @@ def _to_binance_interval(interval: str) -> str:
     return mapping[interval]
 
 
+def _to_yahoo_interval(interval: str) -> str:
+    mapping = {
+        "1m": "1m",
+        "2m": "2m",
+        "5m": "5m",
+        "15m": "15m",
+        "30m": "30m",
+        "60m": "60m",
+        "90m": "90m",
+        "1h": "1h",
+        "1d": "1d",
+    }
+    if interval not in mapping:
+        raise ValueError(f"Unsupported interval: {interval}")
+    return mapping[interval]
+
+
 @dataclass
 class BinanceMarketDataClient:
     """Fetch online OHLCV data from Binance public REST API."""
@@ -69,6 +86,68 @@ class BinanceMarketDataClient:
         if not bars:
             raise ValueError("No kline data returned")
         return bars
+
+
+@dataclass
+class YahooUSMarketDataClient:
+    """Fetch US stock OHLCV data from Yahoo Finance chart API."""
+
+    base_url: str = "https://query1.finance.yahoo.com"
+    timeout: float = 10.0
+    _opener: Callable[..., object] = request.urlopen
+
+    def fetch_klines(self, symbol: str, interval: str = "1d", limit: int = 200) -> List[Bar]:
+        if limit <= 0:
+            raise ValueError("limit must be positive")
+
+        interval_value = _to_yahoo_interval(interval)
+        params = parse.urlencode(
+            {
+                "interval": interval_value,
+                "range": "1mo" if interval_value.endswith("m") or interval_value.endswith("h") else "1y",
+                "includePrePost": "false",
+                "events": "div,split",
+            }
+        )
+        url = f"{self.base_url}/v8/finance/chart/{symbol.upper()}?{params}"
+
+        try:
+            with self._opener(url, timeout=self.timeout) as resp:  # type: ignore[arg-type]
+                payload = json.loads(resp.read().decode("utf-8"))
+        except error.URLError as exc:
+            raise RuntimeError(f"Failed to fetch Yahoo chart data: {exc}") from exc
+
+        chart = payload.get("chart", {})
+        result = (chart.get("result") or [None])[0]
+        if not result:
+            raise ValueError(f"No chart data returned for symbol={symbol}")
+
+        timestamps = result.get("timestamp") or []
+        quotes = ((result.get("indicators") or {}).get("quote") or [None])[0] or {}
+        opens = quotes.get("open") or []
+        highs = quotes.get("high") or []
+        lows = quotes.get("low") or []
+        closes = quotes.get("close") or []
+        volumes = quotes.get("volume") or []
+
+        bars: List[Bar] = []
+        for ts, o, h, l, c, v in zip(timestamps, opens, highs, lows, closes, volumes):
+            if None in {o, h, l, c, v}:
+                continue
+            bars.append(
+                Bar(
+                    timestamp=datetime.fromtimestamp(int(ts), tz=timezone.utc),
+                    open=float(o),
+                    high=float(h),
+                    low=float(l),
+                    close=float(c),
+                    volume=float(v),
+                )
+            )
+
+        if not bars:
+            raise ValueError("No valid Yahoo chart bars returned")
+        return bars[-limit:]
 
 
 @dataclass

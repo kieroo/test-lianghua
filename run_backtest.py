@@ -13,11 +13,12 @@ def main() -> None:
     parser.add_argument("--long-window", type=int, default=20)
     parser.add_argument("--capital", type=float, default=100000)
     parser.add_argument("--fee-rate", type=float, default=0.0005)
+    parser.add_argument("--settlement", choices=["T+0", "T+1"], default="T+0")
     args = parser.parse_args()
 
     bars = load_bars_from_csv(args.data)
     strategy = MovingAverageCrossStrategy(short_window=args.short_window, long_window=args.long_window)
-    backtester = Backtester(initial_capital=args.capital, fee_rate=args.fee_rate)
+    backtester = Backtester(initial_capital=args.capital, fee_rate=args.fee_rate, settlement=args.settlement)
     result = backtester.run(bars, strategy)
     m = compute_metrics(result.equity_curve, result.returns)
 

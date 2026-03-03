@@ -4,7 +4,7 @@ from .backtester import Backtester
 from .data import Bar, load_bars_from_csv
 from .metrics import compute_metrics
 from .strategy import MovingAverageCrossStrategy
-from .live import BinanceMarketDataClient, BinanceSpotTrader, OrderResult
+from .live import BinanceMarketDataClient, BinanceSpotTrader, OrderResult, YahooUSMarketDataClient
 
 __all__ = [
     "Bar",
@@ -14,5 +14,6 @@ __all__ = [
     "load_bars_from_csv",
     "BinanceMarketDataClient",
     "BinanceSpotTrader",
+    "YahooUSMarketDataClient",
     "OrderResult",
 ]
