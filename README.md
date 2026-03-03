@@ -3,7 +3,7 @@
 这是一个轻量级的量化系统，支持：
 
 - 行情数据读取（CSV OHLCV）
-- 策略模块（均线交叉）
+- 策略模块（默认自适应多因子，可选均线交叉）
 - 回测撮合（全仓买入 / 清仓卖出，含手续费）
 - 绩效指标（收益率、年化、波动率、夏普、最大回撤）
 - 在线行情：
@@ -15,7 +15,7 @@
 ## 1) 本地回测
 
 ```bash
-python3 run_backtest.py --data data/sample_ohlcv.csv --short-window 3 --long-window 8
+python3 run_backtest.py --data data/sample_ohlcv.csv --strategy adaptive --short-window 3 --long-window 8
 ```
 
 如需在回测中使用 T+1 约束，可在代码中初始化：
@@ -31,7 +31,7 @@ Backtester(initial_capital=100000, fee_rate=0.001, settlement="T+1")
 默认是 `dry-run`（不会真实下单）：
 
 ```bash
-python3 run_live.py --market crypto --symbol BTCUSDT --interval 1m --short-window 5 --long-window 20 --quantity 0.001 --iterations 3 --settlement T+0
+python3 run_live.py --market crypto --symbol BTCUSDT --interval 1m --strategy adaptive --short-window 5 --long-window 20 --quantity 0.001 --iterations 3 --settlement T+0
 ```
 
 真实下单模式（谨慎使用）：
@@ -49,6 +49,20 @@ python3 run_live.py --market us --symbol AAPL --interval 1d --short-window 5 --l
 ```
 
 > 当前 `--market us` 仅支持 dry-run 信号执行，不进行真实券商下单。
+
+
+## 策略说明
+
+默认使用 `adaptive` 自适应多因子策略，综合以下维度生成信号：
+
+- 趋势强度：短期/长期均线偏离
+- 动量：最近 N 根K线涨跌幅
+- RSI 区间：偏好中等偏强区间，规避极端追涨
+- 波动率过滤：在异常高波动时降低交易置信度
+
+并且采用入场/出场双阈值（hysteresis）降低频繁来回切换。
+
+你也可以使用 `--strategy ma` 回退到原始均线交叉策略。
 
 ## CSV 格式
 

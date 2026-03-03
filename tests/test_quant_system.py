@@ -1,6 +1,13 @@
 from datetime import datetime
 
-from quant_system import Bar, Backtester, MovingAverageCrossStrategy, compute_metrics, load_bars_from_csv
+from quant_system import (
+    AdaptiveMultiFactorStrategy,
+    Bar,
+    Backtester,
+    MovingAverageCrossStrategy,
+    compute_metrics,
+    load_bars_from_csv,
+)
 
 
 def test_load_and_backtest_sample_data():
@@ -48,3 +55,31 @@ def test_t1_disallow_same_day_sell():
 
     assert t0_result.positions == [1, 0, 0]
     assert t1_result.positions == [1, 1, 0]
+
+
+def test_adaptive_strategy_generates_entries_on_uptrend():
+    bars = [
+        Bar(timestamp=datetime(2024, 1, 1, 9, 30), open=10 + i * 0.1, high=10 + i * 0.1, low=10 + i * 0.1, close=10 + i * 0.1, volume=1000)
+        for i in range(80)
+    ]
+
+    strategy = AdaptiveMultiFactorStrategy(short_window=5, long_window=20)
+    signals = [strategy.on_bar(bar) for bar in bars]
+
+    assert any(sig == 1 for sig in signals[-20:])
+
+
+def test_adaptive_strategy_parameter_validation():
+    try:
+        AdaptiveMultiFactorStrategy(short_window=20, long_window=20)
+    except ValueError as exc:
+        assert "short_window" in str(exc)
+    else:
+        raise AssertionError("Expected ValueError")
+
+    try:
+        AdaptiveMultiFactorStrategy(enter_threshold=0.3, exit_threshold=0.3)
+    except ValueError as exc:
+        assert "thresholds" in str(exc)
+    else:
+        raise AssertionError("Expected ValueError")
