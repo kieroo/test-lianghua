@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 
-from quant_system.live import BinanceMarketDataClient, BinanceSpotTrader
+from quant_system.live import BinanceMarketDataClient, BinanceSpotTrader, YahooUSMarketDataClient
 
 
 class _FakeResponse:
@@ -44,3 +44,37 @@ def test_dry_run_market_order():
     assert result.status == "DRY_RUN"
     assert result.symbol == "BTCUSDT"
     assert result.side == "BUY"
+
+
+def test_fetch_yahoo_us_bars():
+    sample = {
+        "chart": {
+            "result": [
+                {
+                    "timestamp": [1710000000, 1710003600],
+                    "indicators": {
+                        "quote": [
+                            {
+                                "open": [100.0, 101.0],
+                                "high": [102.0, 103.0],
+                                "low": [99.0, 100.0],
+                                "close": [101.5, 102.5],
+                                "volume": [1000000, 1200000],
+                            }
+                        ]
+                    },
+                }
+            ]
+        }
+    }
+
+    def fake_open(url, timeout=10.0):
+        assert "finance/chart/AAPL" in url
+        return _FakeResponse(sample)
+
+    client = YahooUSMarketDataClient(_opener=fake_open)
+    bars = client.fetch_klines("AAPL", interval="1h", limit=2)
+
+    assert len(bars) == 2
+    assert bars[0].open == 100.0
+    assert bars[-1].close == 102.5
