@@ -12,6 +12,37 @@
 - 在线交易（Binance Spot，下单支持 dry-run 与真实下单）
 - 交易制度约束（T+0 / T+1，适用于回测与在线循环信号执行）
 
+## 0) 环境准备（先安装依赖）
+
+你的报错 `No module named streamlit` / `No module named pytest` 表示当前 Python 环境没有安装项目依赖。
+
+建议先创建虚拟环境并安装依赖：
+
+### macOS / Linux
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+python3 -m pip install -U pip
+python3 -m pip install -r requirements.txt
+```
+
+### Windows PowerShell
+
+```powershell
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install -U pip
+python -m pip install -r requirements.txt
+```
+
+安装完成后再运行：
+
+```bash
+python3 -m streamlit run run_management_page.py
+python3 -m pytest -q
+```
+
 ## 1) 本地回测
 
 ```bash
