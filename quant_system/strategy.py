@@ -59,11 +59,11 @@ class AdaptiveMultiFactorStrategy:
 
     short_window: int = 5
     long_window: int = 20
-    momentum_window: int = 8
-    rsi_window: int = 14
-    vol_window: int = 20
-    enter_threshold: float = 0.55
-    exit_threshold: float = 0.35
+    momentum_window: int = 5
+    rsi_window: int = 10
+    vol_window: int = 10
+    enter_threshold: float = 0.52
+    exit_threshold: float = 0.38
     max_acceptable_volatility: float = 0.06
 
     def __post_init__(self) -> None:
@@ -76,13 +76,28 @@ class AdaptiveMultiFactorStrategy:
         if not 0 <= self.exit_threshold < self.enter_threshold <= 1:
             raise ValueError("thresholds must satisfy 0 <= exit < enter <= 1")
 
-        maxlen = max(self.long_window, self.momentum_window + 1, self.rsi_window + 1, self.vol_window + 1)
+        # Keep factor windows practical for short-cycle configs (e.g., long_window=8).
+        self._effective_momentum_window = min(self.momentum_window, self.long_window)
+        self._effective_rsi_window = min(self.rsi_window, self.long_window)
+        self._effective_vol_window = min(self.vol_window, self.long_window)
+
+        maxlen = max(
+            self.long_window,
+            self._effective_momentum_window + 1,
+            self._effective_rsi_window + 1,
+            self._effective_vol_window + 1,
+        )
         self._prices: Deque[float] = deque(maxlen=maxlen)
         self._position = 0
 
     def on_bar(self, bar: Bar) -> Signal:
         self._prices.append(bar.close)
-        min_ready = max(self.long_window, self.momentum_window + 1, self.rsi_window + 1, self.vol_window + 1)
+        min_ready = max(
+            self.long_window,
+            self._effective_momentum_window + 1,
+            self._effective_rsi_window + 1,
+            self._effective_vol_window + 1,
+        )
         if len(self._prices) < min_ready:
             return 0
 
@@ -118,7 +133,7 @@ class AdaptiveMultiFactorStrategy:
         return max(0.0, min(1.0, 0.5 + distance * 15.0))
 
     def _momentum_score(self, prices: list[float]) -> float:
-        previous = prices[-self.momentum_window - 1]
+        previous = prices[-self._effective_momentum_window - 1]
         if previous <= 0:
             return 0.0
         momentum = (prices[-1] - previous) / previous
@@ -127,7 +142,7 @@ class AdaptiveMultiFactorStrategy:
     def _rsi_score(self, prices: list[float]) -> float:
         gains = 0.0
         losses = 0.0
-        start = len(prices) - self.rsi_window
+        start = len(prices) - self._effective_rsi_window
         for i in range(start, len(prices)):
             change = prices[i] - prices[i - 1]
             if change > 0:
@@ -135,8 +150,8 @@ class AdaptiveMultiFactorStrategy:
             else:
                 losses -= change
 
-        avg_gain = gains / self.rsi_window
-        avg_loss = losses / self.rsi_window
+        avg_gain = gains / self._effective_rsi_window
+        avg_loss = losses / self._effective_rsi_window
 
         if avg_loss == 0:
             rsi = 100.0
@@ -155,7 +170,7 @@ class AdaptiveMultiFactorStrategy:
 
     def _volatility_score(self, prices: list[float]) -> float:
         returns = []
-        for i in range(len(prices) - self.vol_window, len(prices)):
+        for i in range(len(prices) - self._effective_vol_window, len(prices)):
             prev = prices[i - 1]
             if prev <= 0:
                 continue
