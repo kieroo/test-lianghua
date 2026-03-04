@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from urllib import error
 
 from quant_system.live import BinanceMarketDataClient, BinanceSpotTrader, YahooUSMarketDataClient
 
@@ -68,8 +69,8 @@ def test_fetch_yahoo_us_bars():
         }
     }
 
-    def fake_open(url, timeout=10.0):
-        assert "finance/chart/AAPL" in url
+    def fake_open(req, timeout=10.0):
+        assert "finance/chart/AAPL" in req.full_url
         return _FakeResponse(sample)
 
     client = YahooUSMarketDataClient(_opener=fake_open)
@@ -78,3 +79,41 @@ def test_fetch_yahoo_us_bars():
     assert len(bars) == 2
     assert bars[0].open == 100.0
     assert bars[-1].close == 102.5
+
+
+def test_fetch_yahoo_retries_on_429_then_success(monkeypatch):
+    sample = {
+        "chart": {
+            "result": [
+                {
+                    "timestamp": [1710000000],
+                    "indicators": {
+                        "quote": [
+                            {
+                                "open": [100.0],
+                                "high": [102.0],
+                                "low": [99.0],
+                                "close": [101.5],
+                                "volume": [1000000],
+                            }
+                        ]
+                    },
+                }
+            ]
+        }
+    }
+    calls = {"count": 0}
+
+    def fake_open(req, timeout=10.0):
+        calls["count"] += 1
+        if calls["count"] == 1:
+            raise error.HTTPError(req.full_url, 429, "Too Many Requests", hdrs={"Retry-After": "0"}, fp=None)
+        return _FakeResponse(sample)
+
+    monkeypatch.setattr("quant_system.live.time.sleep", lambda _: None)
+    client = YahooUSMarketDataClient(_opener=fake_open, max_retries=2)
+    bars = client.fetch_klines("AAPL", interval="1h", limit=1)
+
+    assert len(bars) == 1
+    assert bars[0].close == 101.5
+    assert calls["count"] == 2

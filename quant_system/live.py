@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 import hashlib
 import hmac
 import json
+import time
 from typing import Callable, List
 from urllib import error, parse, request
 
@@ -94,6 +95,8 @@ class YahooUSMarketDataClient:
 
     base_url: str = "https://query1.finance.yahoo.com"
     timeout: float = 10.0
+    max_retries: int = 3
+    backoff_seconds: float = 1.0
     _opener: Callable[..., object] = request.urlopen
 
     def fetch_klines(self, symbol: str, interval: str = "1d", limit: int = 200) -> List[Bar]:
@@ -111,11 +114,7 @@ class YahooUSMarketDataClient:
         )
         url = f"{self.base_url}/v8/finance/chart/{symbol.upper()}?{params}"
 
-        try:
-            with self._opener(url, timeout=self.timeout) as resp:  # type: ignore[arg-type]
-                payload = json.loads(resp.read().decode("utf-8"))
-        except error.URLError as exc:
-            raise RuntimeError(f"Failed to fetch Yahoo chart data: {exc}") from exc
+        payload = self._fetch_chart_payload(url)
 
         chart = payload.get("chart", {})
         result = (chart.get("result") or [None])[0]
@@ -148,6 +147,36 @@ class YahooUSMarketDataClient:
         if not bars:
             raise ValueError("No valid Yahoo chart bars returned")
         return bars[-limit:]
+
+    def _fetch_chart_payload(self, url: str) -> dict:
+        req = request.Request(
+            url,
+            headers={
+                "User-Agent": (
+                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+                    "(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+                ),
+                "Accept": "application/json,text/plain,*/*",
+            },
+        )
+
+        last_exc: Exception | None = None
+        for attempt in range(self.max_retries + 1):
+            try:
+                with self._opener(req, timeout=self.timeout) as resp:  # type: ignore[arg-type]
+                    return json.loads(resp.read().decode("utf-8"))
+            except error.HTTPError as exc:
+                last_exc = exc
+                if exc.code != 429 or attempt >= self.max_retries:
+                    break
+                retry_after_header = exc.headers.get("Retry-After") if exc.headers else None
+                retry_after = float(retry_after_header) if retry_after_header else self.backoff_seconds * (attempt + 1)
+                time.sleep(retry_after)
+            except error.URLError as exc:
+                last_exc = exc
+                break
+
+        raise RuntimeError(f"Failed to fetch Yahoo chart data: {last_exc}") from last_exc
 
 
 @dataclass
