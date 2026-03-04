@@ -5,6 +5,7 @@ from .data import Bar, load_bars_from_csv
 from .metrics import compute_metrics
 from .strategy import AdaptiveMultiFactorStrategy, MovingAverageCrossStrategy
 from .live import BinanceMarketDataClient, BinanceSpotTrader, OrderResult, YahooUSMarketDataClient
+from .management import Execution, ManagementService, Position, StrategyConfig
 
 __all__ = [
     "Bar",
@@ -17,4 +18,8 @@ __all__ = [
     "BinanceSpotTrader",
     "YahooUSMarketDataClient",
     "OrderResult",
+    "StrategyConfig",
+    "Position",
+    "Execution",
+    "ManagementService",
 ]

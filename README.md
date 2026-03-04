@@ -51,6 +51,21 @@ python3 run_live.py --market us --symbol AAPL --interval 1d --short-window 5 --l
 > 当前 `--market us` 仅支持 dry-run 信号执行，不进行真实券商下单。
 
 
+## 3) 管理页面（回测 / 调参 / 持仓 / 下单）
+
+可通过 Streamlit 打开一个简单管理页面，包含：
+
+- 回测执行
+- 策略参数调整（`adaptive` / `ma`）
+- 持仓与现金查看
+- 手动下单与订单记录
+
+运行方式：
+
+```bash
+python3 -m streamlit run run_management_page.py
+```
+
 ## 策略说明
 
 默认使用 `adaptive` 自适应多因子策略，综合以下维度生成信号：
